@@ -1,58 +1,18 @@
 import json
-from sentence_transformers import SentenceTransformer, InputExample
-from sentence_transformers.sentence_transformer import losses
-from torch.utils.data import DataLoader, Dataset
 import torch
 import torch.nn as nn
-from sklearn.model_selection import train_test_split
+from torch.utils.data import Dataset, DataLoader
+from sentence_transformers import SentenceTransformer
 from sklearn.preprocessing import MultiLabelBinarizer
-
-def sbert_legit_comands():
-    # 1. Загружаем легитимные команды
-    with open('data/terminal_cmds.jsonl', 'r', encoding='utf-8') as f:
-        commands = [json.loads(line) for line in f if line.strip()]
-
-    print(f"Всего команд: {len(commands)}")
-
-    # 2. Пары command - description
-    train_examples = []
-    skipped = 0
-
-    for cmd in commands:
-        command_text = cmd.get('command', '').strip()
-        description = cmd.get('description', '').strip()
-
-        if command_text and description:
-            train_examples.append(InputExample(texts=[command_text, description]))
-        else:
-            skipped += 1
-
-    print(f"Пар для обучения: {len(train_examples)}")
-    print(f"Пропущено (нет description): {skipped}")
-
-    # 3. Модель
-    model = SentenceTransformer('all-MiniLM-L6-v2')
-
-    train_dataloader = DataLoader(train_examples, shuffle=True, batch_size=32)
-    train_loss = losses.MultipleNegativesRankingLoss(model)
-
-    # 4. Обучение
-    model.fit(
-        train_objectives=[(train_dataloader, train_loss)],
-        epochs=10,
-        warmup_steps=int(len(train_dataloader) * 0.1),
-        show_progress_bar=True
-    )
-    # 5. Сохраняем
-    model.save('command-encoder')
-    print("Энкодер сохранён в command-encoder/")
-
+from sklearn.model_selection import train_test_split
 
 # ─── 1. Загрузка ───
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-encoder = SentenceTransformer('command-encoder')
+print(f"Device: {device}")
 
-with open('Logs/sessions.json', 'r', encoding='utf-8') as f:
+encoder = SentenceTransformer('../command-encoder', device=device)
+
+with open('../Logs/sessions.json', 'r', encoding='utf-8') as f:
     sessions = json.load(f)
 
 print(f"Сессий всего: {len(sessions)}")
@@ -66,7 +26,7 @@ mlb = MultiLabelBinarizer()
 mlb.fit([all_tactics])
 
 print(f"Типы: {type_to_idx}")
-print(f"Тактик: {len(all_tactics)} — {all_tactics}")
+print(f"Тактик: {len(all_tactics)}")
 
 
 # ─── 3. Датасет ───
@@ -75,7 +35,7 @@ class SessionDataset(Dataset):
         self.sessions = sessions
         self.encoder = encoder
         self.max_len = max_len
-        self.emb_dim = encoder.get_sentence_embedding_dimension()
+        self.emb_dim = encoder.get_embedding_dimension()
 
     def __len__(self):
         return len(self.sessions)
@@ -87,7 +47,7 @@ class SessionDataset(Dataset):
         if commands:
             emb = self.encoder.encode(commands, convert_to_tensor=True)
             if emb.shape[0] < self.max_len:
-                pad = torch.zeros(self.max_len - emb.shape[0], self.emb_dim)
+                pad = torch.zeros(self.max_len - emb.shape[0], self.emb_dim, device=emb.device)
                 emb = torch.cat([emb, pad])
             else:
                 emb = emb[:self.max_len]
@@ -116,24 +76,69 @@ class SessionClassifier(nn.Module):
         return self.head_type(pooled), torch.sigmoid(self.head_tactics(pooled))
 
 
-# ─── 5. Train/Test ───
-dataset = SessionDataset(sessions, encoder)
+# ─── 5. Загружаем эмбеддинги заранее (фикс GPU/CPU) ───
+print("Кодируем сессии...")
+all_embeddings = []
+all_type_labels = []
+all_tactic_labels = []
 
-train_data, test_data = train_test_split(dataset, test_size=0.2, random_state=42)
-train_loader = DataLoader(train_data, batch_size=16, shuffle=True)
-test_loader = DataLoader(test_data, batch_size=16)
+for i in range(len(sessions)):
+    if i % 500 == 0:
+        print(f"  {i}/{len(sessions)}")
+    s = sessions[i]
+    commands = [c['cmd'] for c in s['commands'][:50]]
 
-model = SessionClassifier(emb_dim=384, num_types=3, num_tactics=len(all_tactics))
+    if commands:
+        emb = encoder.encode(commands, convert_to_tensor=True)
+        if emb.shape[0] < 50:
+            pad = torch.zeros(50 - emb.shape[0], emb.shape[1], device=emb.device)
+            emb = torch.cat([emb, pad])
+        else:
+            emb = emb[:50]
+    else:
+        emb = torch.zeros(50, 384)
+
+    all_embeddings.append(emb.cpu())
+    all_type_labels.append(type_to_idx.get(s['type'], 0))
+    all_tactic_labels.append(torch.tensor(mlb.transform([s.get('tactics', [])])[0], dtype=torch.float))
+
+print("Готово.")
+
+# ─── 6. Разделение ───
+embeddings_tensor = torch.stack(all_embeddings)
+type_tensor = torch.tensor(all_type_labels)
+tactics_tensor = torch.stack(all_tactic_labels)
+
+indices = list(range(len(sessions)))
+train_idx, test_idx = train_test_split(indices, test_size=0.2, random_state=42)
+
+train_emb = embeddings_tensor[train_idx]
+train_type = type_tensor[train_idx]
+train_tactics = tactics_tensor[train_idx]
+
+test_emb = embeddings_tensor[test_idx]
+test_type = type_tensor[test_idx]
+test_tactics = tactics_tensor[test_idx]
+
+train_dataset = torch.utils.data.TensorDataset(train_emb, train_type, train_tactics)
+test_dataset = torch.utils.data.TensorDataset(test_emb, test_type, test_tactics)
+
+train_loader = DataLoader(train_dataset, batch_size=16, shuffle=True)
+test_loader = DataLoader(test_dataset, batch_size=16)
+
+# ─── 7. Модель ───
+model = SessionClassifier(emb_dim=384, num_types=3, num_tactics=len(all_tactics)).to(device)
 optimizer = torch.optim.Adam(model.parameters(), lr=1e-4)
 loss_type = nn.CrossEntropyLoss()
 loss_tactics = nn.BCELoss()
 
-# ─── 6. Обучение ───
+# ─── 8. Обучение ───
 epochs = 10
 for epoch in range(epochs):
     model.train()
     total_loss = 0
     for emb, t_label, t_hot in train_loader:
+        emb, t_label, t_hot = emb.to(device), t_label.to(device), t_hot.to(device)
         optimizer.zero_grad()
         out_type, out_tactics = model(emb)
         loss = loss_type(out_type, t_label) + loss_tactics(out_tactics, t_hot)
@@ -141,19 +146,19 @@ for epoch in range(epochs):
         optimizer.step()
         total_loss += loss.item()
 
-    # Оценка
     model.eval()
     correct = 0
     total = 0
     with torch.no_grad():
         for emb, t_label, _ in test_loader:
+            emb, t_label = emb.to(device), t_label.to(device)
             out_type, _ = model(emb)
             correct += (out_type.argmax(1) == t_label).sum().item()
             total += t_label.size(0)
 
     print(f"Epoch {epoch + 1}/{epochs} | Loss: {total_loss / len(train_loader):.4f} | Acc: {correct / total:.2%}")
 
-# ─── 7. Сохранение ───
+# ─── 9. Сохранение ───
 torch.save({
     'model_state_dict': model.state_dict(),
     'all_tactics': all_tactics,
