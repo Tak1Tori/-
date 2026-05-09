@@ -32,7 +32,7 @@ print(f"Типы: {type_to_idx}")
 print(f"Тактик: {len(all_tactics)}")
 
 # Разделение
-dataset = SessionDataset(sessions, encoder)
+dataset = SessionDataset(sessions, encoder, type_to_idx, mlb)
 
 train_data, test_data = train_test_split(dataset, test_size=0.2, random_state=42)
 
@@ -77,6 +77,6 @@ torch.save({
     'all_tactics': all_tactics,
     'type_to_idx': type_to_idx,
     'mlb_classes': mlb.classes_.tolist()
-}, 'session-classifier.pt')
+}, '../session-classifier.pt')
 
 print("Модель сохранена: session-classifier.pt")

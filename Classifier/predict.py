@@ -14,7 +14,7 @@ def load_model(model_path='session-classifier.pt'):
         return _model, _encoder, _checkpoint
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    _encoder = SentenceTransformer('command-encoder', device=device)
+    _encoder = SentenceTransformer('../command-encoder', device=device)
     _checkpoint = torch.load(model_path, map_location=device)
 
     _model = SessionClassifier(
