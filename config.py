@@ -1,23 +1,33 @@
 #Constant
 
-NUM_BENIGN_SESSIONS = 1000  # чисто легитимные сессии
-NUM_MALICIOUS_SESSIONS = 600  # сессии с атаками (шум + пейлоад)
-NUM_MIXED_SESSIONS = 400  # сессии, где атака спрятана глубоко в шуме
-NUM_LOGS = 20000 # количество сессий для HTTP
-RAW_RESERVED_USERNAME = 'Raw_data/reserved-usernames.csv'
-RAW_RESERVED_PASSWORD = 'Raw_data/passwords.csv'
+NUM_BENIGN_SESSIONS = 10000  # чисто легитимные сессии
+NUM_MALICIOUS_SESSIONS = 6000  # сессии с атаками (шум + пейлоад)
+NUM_MIXED_SESSIONS = 4000  # сессии, где атака спрятана глубоко в шуме
+RAW_RESERVED_USERNAME = '../Raw_data/reserved-usernames.csv'
+RAW_RESERVED_PASSWORD = '../Raw_data/passwords.csv'
 LINUX_LANGUAGES = {'bash', 'sh', 'python', 'perl', 'python3', 'php', 'ruby', 'lua', 'awk', 'gawk'}
-ATOMIC_DIR = "Raw_data/atomics"  # путь к папке с техниками
-RAW_LINUX_TERMINAL_COMMANDS = "Raw_data/LINUX_TERMINAL_COMMANDS.jsonl"
-RAW_REVERSESHELL_PLAYLOADS_DATASET = "Raw_data/Reverseshell_payloads_dataset.jsonl"
-ATOMIC_LINUX_PLAYLOADS = "Data/atomic_linux_payloads.jsonl"
-RSHELL_LINUX_ONLY = "Data/rshell_linux_only.jsonl"
-TERMINAL_COMMANDS = "Data/terminal_cmds.jsonl"
-EXPLOITDB_DIR = "Raw_data/exploitdb"
+ATOMIC_DIR = "../Raw_data/atomics"  # путь к папке с техниками
+RAW_LINUX_TERMINAL_COMMANDS = "../Raw_data/LINUX_TERMINAL_COMMANDS.jsonl"
+RAW_REVERSESHELL_PLAYLOADS_DATASET = "../Raw_data/Reverseshell_payloads_dataset.jsonl"
+ATOMIC_LINUX_PLAYLOADS = "../Data/atomic_linux_payloads.jsonl"
+RSHELL_LINUX_ONLY = "../Data/rshell_linux_only.jsonl"
+TERMINAL_COMMANDS = "../Data/terminal_cmds.jsonl"
+EXPLOITDB_DIR = "../Raw_data/exploitdb"
 CSV_FILES = ["files_exploits.csv", "files_shellcodes.csv"]
-EXPLOITDB_SHELL_ONLY = "Data/exploitdb_shell_only.jsonl"
-LOGS_SSH = 'Logs/session.json'
-
+EXPLOITDB_SHELL_ONLY = "../Data/exploitdb_shell_only.jsonl"
+LOGS_SSH = '../Logs/session.json'
+RAW_WEB = '../Raw_data/WEB_APPLICATION_PAYLOADS.json'
+WEB = '../Data/web_payloads.jsonl'
+TARGET_DIRS = [
+    'Command Injection',
+    'Directory Traversal',
+    'Server Side Request Forgery',
+    'XXE Injection',
+    'XSS Injection',
+    'File Inclusion',
+    'NoSQL Injection'
+]
+PAYLOADS_ALL_PATH = '../Raw_data/'
 #Mapping Category
 
 CATEGORY_TO_TACTIC = {

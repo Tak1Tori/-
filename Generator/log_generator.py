@@ -1,14 +1,12 @@
 #Libraries
-import string
-import pandas as pd
 import json
-import random
 import uuid
+import random
 from datetime import datetime, timedelta
 from config import (TERMINAL_COMMANDS, ATOMIC_LINUX_PLAYLOADS, NUM_BENIGN_SESSIONS, DESCRIPTION_TO_TACTIC,
-                    RSHELL_LINUX_ONLY, EXPLOITDB_SHELL_ONLY,NUM_MALICIOUS_SESSIONS, RAW_RESERVED_PASSWORD,
-                    TECHNIQUE_TO_TACTIC,CATEGORY_TO_TACTIC, NUM_MIXED_SESSIONS, RAW_RESERVED_USERNAME, LOGS_SSH)
-
+                    RSHELL_LINUX_ONLY, EXPLOITDB_SHELL_ONLY,NUM_MALICIOUS_SESSIONS,TECHNIQUE_TO_TACTIC,
+                    CATEGORY_TO_TACTIC, NUM_MIXED_SESSIONS, LOGS_SSH)
+from utils import get_random_datetime, ipv4_rand, rand_password, rand_login
 
 with open(TERMINAL_COMMANDS, 'r', encoding='utf-8') as f:
     LEGIT_COMMANDS = [json.loads(line) for line in f if line.strip()]
@@ -68,59 +66,6 @@ def get_tactics_from_description(desc):
             tactics.append(tactic)
 
     return tactics if tactics else ['Unknown']
-#Random password
-def rand_password():
-    df = pd.read_csv(RAW_RESERVED_PASSWORD, usecols=['password'])
-    random_value = df['password'].sample().iloc[0]
-    ran_pass = random.choice([1, 2, 3])
-
-    if ran_pass == 1 or ran_pass == 2:
-        password = random_value
-    else:
-        password = ''
-        chars = string.ascii_letters + string.digits
-        for j in range(-1, random.randrange(1, 24)):
-            password += random.choice(chars)
-    return password
-
-#Random login(username)
-def rand_login():
-    df = pd.read_csv(RAW_RESERVED_USERNAME, usecols=['Username'])
-    random_value = df['Username'].dropna().sample().iloc[0]
-    ran_log = random.choice([1, 2, 3, 4, 5])
-
-    if ran_log == 1 or ran_log == 2:
-        login = random_value
-    elif ran_log == 3:
-        login = 'root'
-    elif ran_log == 4:
-        login = rand_password()
-    else:
-        login = ''
-        chars = string.ascii_letters + string.digits
-        for j in range(-1, random.randrange(1, 24)):
-            login += random.choice(chars)
-    return login
-
-#Random IPv4
-def ipv4_rand():
-    ipv4_1 = random.randrange(0, 255)
-    ipv4_2 = random.randrange(0, 255)
-    ipv4_3 = random.randrange(0, 255)
-    ipv4_4 = random.randrange(0, 255)
-    return f"{ipv4_1}.{ipv4_2}.{ipv4_3}.{ipv4_4}"
-
-#Random date
-def get_random_datetime(start_date, end_date):
-    # Считаем разницу между датами в секундах
-    delta = end_date - start_date
-    seconds_range = int(delta.total_seconds())
-
-    # Выбираем случайное количество секунд
-    random_seconds = random.randrange(seconds_range)
-
-    # Прибавляем их к начальной дате
-    return start_date + timedelta(seconds=random_seconds)
 
 #Random legit command
 def random_legit_command():
@@ -329,7 +274,10 @@ def log_ssh_generator():
     print(f"Вредоносных сессий: {NUM_MALICIOUS_SESSIONS}")
     print(f"Смешанных сессий: {NUM_MIXED_SESSIONS}")
 
-    with open(LOG_SSH, 'w', encoding='utf-8') as f:
+    with open(LOGS_SSH, 'w', encoding='utf-8') as f:
         json.dump(all_sessions, f, indent=2, ensure_ascii=False)
 
     print(f"Метаданные сохранены в sessions_meta.json")
+
+if __name__ == "__main__":
+    log_ssh_generator()

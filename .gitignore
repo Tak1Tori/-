@@ -8,6 +8,6 @@ __pycache__/
 
 #Large files
 command-encoder/
+Http-encoder/
 Data/
-Logs/
 Raw_data/
